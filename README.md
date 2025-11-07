@@ -1,6 +1,21 @@
 # dronescapes
 Apps to create and generate drone- and soundscapes
 
+GENERATE ENDLESS DRONES
+Compose evolving worlds of sound directly in your browser
+
+Looking for new textures that never sit still?
+Tonal Weave and the 8-Track Drone Mixer are two free creative tools built for composers and producers who sculpt atmosphere and emotion.
+
+Tonal Weave generates harmonic MIDI patterns that slowly drift and interlock—perfect for ambient beds, film scoring, or modular experimentation.
+8-Track Drone Mixer lets you layer, crossfade, and modulate up to eight audio stems into infinite, breathing soundscapes.
+
+Everything runs locally in your browser. No installs, no accounts—just pure creation.
+
+🎧 Build evolving drones. Shape time. Paint space.
+Try them free and start weaving your own sonic universe:
+[Tonal Weave + Drone Mixer – Open in Browser]
+
 —————————————————————————————————————————————————————————————————————————————
 This package contains:
 
