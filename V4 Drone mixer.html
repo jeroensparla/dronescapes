@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<title>8-Track Drone Mixer • Presets + WebM Recorder + LFO Pan</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root { --bg:#f4f5f7; --fg:#222; --card:#fff; --accent:#4f7ef6; --muted:#eef0f4; --ok:#0f9d58; --danger:#e74c3c; }
+  * { box-sizing:border-box; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:var(--bg); color:var(--fg); margin:0; padding:18px; }
+  h1 { text-align:center; margin:0 0 12px 0; font-size:22px; }
+  .section { max-width:1300px; margin:0 auto 16px auto; }
+  .panel { background:var(--card); border-radius:12px; padding:12px 14px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .global-controls { text-align:center; }
+  .global-controls button { margin:0 6px 8px 6px; padding:9px 14px; background:var(--accent); border:none; border-radius:8px; color:#fff; cursor:pointer; font-weight:600; }
+  .global-controls button:hover { filter:brightness(0.95); }
+  .row { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; justify-content:center; }
+  .inline-group { display:inline-block; margin:0 10px 10px 10px; vertical-align:top; }
+  .inline-group label { display:block; font-size:12px; margin-bottom:4px; }
+  .inline-group input[type=range], .inline-group input[type=text] { width:180px; }
+  .presetbox { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center; margin:10px 0 4px 0; }
+  .presetbox input[type=file]{ display:none; }
+  .fakefile { background:#eee; padding:6px 12px; border-radius:8px; cursor:pointer; font-size:12px; display:inline-block; }
+  .track-container { display:grid; grid-template-columns:repeat(4, minmax(250px,1fr)); gap:14px; }
+  .track { background:var(--card); border-radius:12px; padding:10px; box-shadow:0 1px 4px rgba(0,0,0,.05); }
+  .track h2 { text-align:center; margin:0 0 8px 0; font-size:15px; }
+  .file-input { text-align:center; margin-bottom:6px; }
+  .file-input input[type=file] { display:none; }
+  .file-input label { background:#eee; padding:6px 12px; border-radius:8px; cursor:pointer; font-size:12px; }
+  .sample-status { text-align:center; font-size:11px; margin:6px 0; padding:5px 8px; border-radius:999px; background:var(--muted); }
+  .sample-status.loaded { background:#e0f5e7; color:#166537; font-weight:600; }
+  .controls { display:flex; justify-content:center; gap:8px; margin:6px 0; }
+  .controls button { background:var(--accent); color:#fff; border:none; border-radius:8px; font-size:12px; padding:6px 10px; cursor:pointer; }
+  .loop-toggle { text-align:center; font-size:11px; margin-bottom:6px; }
+  .slider-group { margin-bottom:6px; font-size:12px; }
+  .slider-group label { display:block; margin-bottom:2px; }
+  .slider-group input[type=range], .slider-group select { width:100%; }
+  .lfo-block { background:#f6f7fb; border:1px solid #e0e3ef; border-radius:8px; padding:6px; margin-top:6px; }
+  .lfo-block h3 { margin:0 0 4px 0; font-size:11px; }
+  .lfo-row { display:flex; align-items:center; gap:8px; }
+  .lfo-row input[type=range] { flex:1; }
+  .recbox { display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:center; margin-top:8px; }
+  .pill { display:inline-flex; align-items:center; gap:8px; padding:7px 12px; background:#fff; border:1px solid #e7e7e7; border-radius:999px; font-size:12px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:#bbb; }
+  .dot.live { background:var(--danger); box-shadow:0 0 0 6px rgba(231,76,60,.12); }
+  .download { text-align:center; margin-top:8px; }
+  .download a { display:inline-block; margin:4px; padding:10px 14px; background:var(--ok); color:#fff; border-radius:8px; text-decoration:none; font-weight:700; }
+  .note { text-align:center; font-size:11px; color:#555; margin-top:6px; }
+</style>
+</head>
+<body>
+<h1>8-Track Drone Mixer • Presets + WebM Recorder + LFO Pan</h1>
+
+<div class="section panel global-controls">
+  <button id="playAll">Play All</button>
+  <button id="pauseAll">Pause All</button>
+  <button id="stopAll">Stop All</button>
+  <div class="row">
+    <div class="inline-group">
+      <label for="masterVol">Master volume</label>
+      <input type="range" id="masterVol" min="0" max="100" value="85">
+    </div>
+    <div class="inline-group">
+      <label for="masterRev">Master reverb</label>
+      <input type="range" id="masterRev" min="0" max="100" value="20">
+    </div>
+    <div class="inline-group">
+      <label for="crossfade12">Crossfade 1–2</label>
+      <input type="range" id="crossfade12" min="0" max="100" value="50">
+      <label style="margin-top:4px;"><input type="checkbox" id="autoCF12" checked> Auto</label>
+      <input type="range" id="autoCF12Speed" min="10" max="180" value="60">
+    </div>
+    <div class="inline-group">
+      <label for="crossfade34">Crossfade 3–4</label>
+      <input type="range" id="crossfade34" min="0" max="100" value="50">
+      <label style="margin-top:4px;"><input type="checkbox" id="autoCF34" checked> Auto</label>
+      <input type="range" id="autoCF34Speed" min="10" max="180" value="90">
+    </div>
+    <div class="inline-group">
+      <label for="crossfade56">Crossfade 5–6</label>
+      <input type="range" id="crossfade56" min="0" max="100" value="50">
+      <label style="margin-top:4px;"><input type="checkbox" id="autoCF56" checked> Auto</label>
+      <input type="range" id="autoCF56Speed" min="10" max="180" value="75">
+    </div>
+    <div class="inline-group">
+      <label for="crossfade78">Crossfade 7–8</label>
+      <input type="range" id="crossfade78" min="0" max="100" value="50">
+      <label style="margin-top:4px;"><input type="checkbox" id="autoCF78" checked> Auto</label>
+      <input type="range" id="autoCF78Speed" min="10" max="180" value="105">
+    </div>
+    <div class="inline-group">
+      <label><input type="checkbox" id="randomStartOn" checked> Random start</label>
+      <label for="randomStartMax">Max offset (s)</label>
+      <input type="range" id="randomStartMax" min="0" max="10" value="4">
+    </div>
+  </div>
+
+  <div class="presetbox">
+    <div class="inline-group">
+      <label for="projectName">Projectnaam</label>
+      <input type="text" id="projectName" placeholder="Mijn drone preset">
+    </div>
+    <button id="savePreset">Save Preset</button>
+    <label for="loadPreset" class="fakefile">Load Preset</label>
+    <input type="file" id="loadPreset" accept="application/json">
+    <button id="clearAll">Clear All</button>
+  </div>
+
+  <div class="recbox">
+    <div class="pill"><span class="dot" id="recDot"></span><span id="recStatus">Klaar om op te nemen</span></div>
+    <div class="pill">Opnameformaat: WebM/Opus, automatische WAV-fallback</div>
+  </div>
+  <div class="download" id="downloadArea"></div>
+  <div class="note">Play All start de opname, Stop All stopt en geeft een downloadlink. Alle tracks loopen standaard.</div>
+</div>
+
+<div class="section track-container" id="tracksRoot">
+  <!-- Tracks worden dynamisch ingevoegd -->
+</div>
+
+<script>
+/* ====== Audio setup ====== */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const masterGain = audioCtx.createGain(); masterGain.gain.value = 0.85;
+const reverb = audioCtx.createConvolver();
+const reverbGain = audioCtx.createGain(); reverbGain.gain.value = 0.2;
+
+// Crossfade pairs: 1–2, 3–4, 5–6, 7–8
+const cfPairs = {
+  '12': {a: audioCtx.createGain(), b: audioCtx.createGain()},
+  '34': {a: audioCtx.createGain(), b: audioCtx.createGain()},
+  '56': {a: audioCtx.createGain(), b: audioCtx.createGain()},
+  '78': {a: audioCtx.createGain(), b: audioCtx.createGain()},
+};
+for (const k of Object.keys(cfPairs)){
+  cfPairs[k].a.gain.value = 0.5;
+  cfPairs[k].b.gain.value = 0.5;
+  cfPairs[k].a.connect(masterGain);
+  cfPairs[k].b.connect(masterGain);
+}
+
+masterGain.connect(reverb);
+reverb.connect(reverbGain);
+
+const speakerBus = audioCtx.createGain();
+speakerBus.connect(audioCtx.destination);
+masterGain.connect(speakerBus);
+reverbGain.connect(speakerBus);
+
+const recordBus = audioCtx.createGain();
+masterGain.connect(recordBus);
+reverbGain.connect(recordBus);
+
+// Reverb IR
+function createImpulseClean(duration=1.1){
+  const sr=audioCtx.sampleRate, len=Math.floor(sr*duration);
+  const buf=audioCtx.createBuffer(2,len,sr);
+  for(let ch=0; ch<2; ch++){
+    const d=buf.getChannelData(ch);
+    for(let i=0;i<len;i++){ const env=Math.pow(1-i/len,4); d[i]=env; }
+  }
+  return buf;
+}
+reverb.buffer = createImpulseClean(1.1);
+
+/* ====== UI helpers ====== */
+const q = (id)=>document.getElementById(id);
+function setPair(pairKey, v){
+  const now = audioCtx.currentTime;
+  const p = cfPairs[pairKey]; if (!p) return;
+  p.a.gain.setTargetAtTime(1-v, now, .03);
+  p.b.gain.setTargetAtTime(v, now, .03);
+}
+function startAutoCross(checkId, speedId, slider, pairKey){
+  const chk=q(checkId), spd=q(speedId);
+  function loop(){
+    if (chk.checked){
+      const now = audioCtx.currentTime;
+      const period = parseFloat(spd.value);
+      const phase = (now % period) / period;
+      const v = 0.5 + 0.5 * Math.sin(phase * 2 * Math.PI);
+      slider.value = Math.floor(v*100);
+      setPair(pairKey, v);
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ====== Tracks build (8) ====== */
+const tracks = []; // 1-based index
+const tracksRoot = q('tracksRoot');
+
+function trackTemplate(i){
+  return `
+  <div class="track" id="t${i}">
+    <h2>Track ${i}</h2>
+    <div class="file-input"><label for="file${i}">Sample laden</label><input type="file" id="file${i}" accept="audio/*"></div>
+    <div class="sample-status" id="status${i}">Leeg</div>
+    <div class="controls"><button id="play${i}">Play</button><button id="stop${i}">Stop</button></div>
+    <label class="loop-toggle"><input type="checkbox" id="loop${i}" checked> Loop</label>
+    <div class="slider-group"><label for="vol${i}">Gain</label><input type="range" id="vol${i}" min="0" max="100" value="90"></div>
+    <div class="slider-group"><label for="pan${i}">Pan</label><input type="range" id="pan${i}" min="-100" max="100" value="0"></div>
+    <div class="slider-group"><label for="pitch${i}">Pitch</label><input type="range" id="pitch${i}" min="-12" max="12" value="0"></div>
+    <div class="slider-group"><label for="filter${i}">Filter</label><input type="range" id="filter${i}" min="200" max="10000" value="10000">
+      <select id="filterType${i}"><option value="off">Off</option><option value="lowpass">Low-pass</option><option value="highpass">High-pass</option></select></div>
+    <div class="slider-group"><label for="send${i}">Reverb send</label><input type="range" id="send${i}" min="0" max="100" value="30"></div>
+    <div class="lfo-block"><h3>LFO Pan</h3>
+      <div class="lfo-row">
+        <label><input type="checkbox" id="lfoOn${i}" checked> On</label>
+        <label for="lfoSpeed${i}">Snelheid (s/osc)</label>
+        <input type="range" id="lfoSpeed${i}" min="2" max="60" value="${20 + (i-1)*2}">
+      </div>
+      <div class="lfo-row">
+        <label for="lfoDepth${i}">Diepte</label>
+        <input type="range" id="lfoDepth${i}" min="0" max="100" value="70">
+      </div>
+    </div>
+  </div>`;
+}
+
+function createTrackChain(i){
+  const preGain = audioCtx.createGain();
+  const filter = audioCtx.createBiquadFilter();
+  const pan = audioCtx.createStereoPanner();
+  const send = audioCtx.createGain();
+
+  preGain.gain.value = parseFloat(q('vol'+i).value)/100;
+  filter.type = 'allpass'; filter.frequency.value = 10000;
+  send.gain.value = parseFloat(q('send'+i).value)/100;
+
+  preGain.connect(filter);
+  filter.connect(pan);
+  filter.connect(send);
+  send.connect(reverb);
+
+  // route naar juiste crossfade-pair
+  let pairKey = null;
+  if (i===1) { pairKey='12'; cfPairs[pairKey].a && pan.connect(cfPairs[pairKey].a); }
+  if (i===2) { pairKey='12'; cfPairs[pairKey].b && pan.connect(cfPairs[pairKey].b); }
+  if (i===3) { pairKey='34'; cfPairs[pairKey].a && pan.connect(cfPairs[pairKey].a); }
+  if (i===4) { pairKey='34'; cfPairs[pairKey].b && pan.connect(cfPairs[pairKey].b); }
+  if (i===5) { pairKey='56'; cfPairs[pairKey].a && pan.connect(cfPairs[pairKey].a); }
+  if (i===6) { pairKey='56'; cfPairs[pairKey].b && pan.connect(cfPairs[pairKey].b); }
+  if (i===7) { pairKey='78'; cfPairs[pairKey].a && pan.connect(cfPairs[pairKey].a); }
+  if (i===8) { pairKey='78'; cfPairs[pairKey].b && pan.connect(cfPairs[pairKey].b); }
+
+  return {preGain, filter, pan, send};
+}
+
+// bouw UI
+for (let i=1;i<=8;i++){ tracksRoot.insertAdjacentHTML('beforeend', trackTemplate(i)); }
+for (let i=1;i<=8;i++){ makeTrack(i); }
+
+function makeTrack(i){
+  const fileInput=q('file'+i), status=q('status'+i);
+  const playBtn=q('play'+i), stopBtn=q('stop'+i);
+  const vol=q('vol'+i), pan=q('pan'+i), pitch=q('pitch'+i);
+  const filterSlider=q('filter'+i), filterType=q('filterType'+i), send=q('send'+i);
+  const loopCB=q('loop'+i), lfoOn=q('lfoOn'+i), lfoSpeed=q('lfoSpeed'+i), lfoDepth=q('lfoDepth'+i);
+
+  const chain=createTrackChain(i);
+  const t={
+    index:i, buffer:null, source:null, isPlaying:false, startTime:0, pauseOffset:0,
+    loop:true, pitch:0, chain,
+    basePan: 0, lfoEnabled: true,
+    lfoPeriod: parseFloat(lfoSpeed.value), lfoDepth: parseFloat(lfoDepth.value)/100,
+    lfoPhaseOffset: Math.random()*Math.PI*2,
+    // voor presets: originele file bytes en metadata
+    sampleArrayBuffer: null, sampleMime: null, sampleName: null
+  };
+  tracks[i]=t;
+
+  fileInput.addEventListener('change', async ()=>{
+    const file=fileInput.files[0];
+    if (!file){ t.buffer=null; t.sampleArrayBuffer=null; t.sampleMime=null; t.sampleName=null; status.textContent='Leeg'; status.classList.remove('loaded'); return; }
+    const arr = await file.arrayBuffer();
+    t.sampleArrayBuffer = arr; t.sampleMime = file.type || 'audio/wav'; t.sampleName = file.name;
+    const buf = await audioCtx.decodeAudioData(arr.slice(0)); // slice om detaching te voorkomen
+    t.buffer = buf; t.loop = true; loopCB.checked = true;
+    status.textContent = file.name; status.classList.add('loaded');
+  });
+
+  function makeSrc(){
+    const src=audioCtx.createBufferSource();
+    src.buffer=t.buffer; src.loop=t.loop;
+    src.playbackRate.value=Math.pow(2,t.pitch/12);
+    src.connect(t.chain.preGain);
+    return src;
+  }
+  function start(){
+    if (!t.buffer) return;
+    if (audioCtx.state==='suspended') audioCtx.resume();
+    t.source=makeSrc();
+    const off=t.pauseOffset % t.buffer.duration;
+    t.startTime=audioCtx.currentTime - off;
+    t.source.start(0, off);
+    t.isPlaying=true;
+    t.source.onended=()=>{ if (!t.loop){ t.isPlaying=false; t.pauseOffset=0; playBtn.textContent='Play'; } };
+  }
+
+  playBtn.addEventListener('click', ()=>{
+    if (!t.buffer) return;
+    if (!t.isPlaying){ start(); playBtn.textContent='Pause'; }
+    else {
+      const now=audioCtx.currentTime; t.pauseOffset=now - t.startTime;
+      try{ t.source.stop(); }catch(_){}
+      t.source.disconnect(); t.source=null; t.isPlaying=false; playBtn.textContent='Play';
+    }
+  });
+  stopBtn.addEventListener('click', ()=>{
+    if (t.source){ try{ t.source.stop(); }catch(_){}
+      t.source.disconnect(); t.source=null; }
+    t.isPlaying=false; t.pauseOffset=0; playBtn.textContent='Play';
+  });
+
+  loopCB.addEventListener('change', e=>{ t.loop=e.target.checked; if (t.source) t.source.loop=t.loop; });
+  vol.addEventListener('input', e=> t.chain.preGain.gain.value = parseFloat(e.target.value)/100 );
+  pan.addEventListener('input', e=> { t.basePan = parseFloat(e.target.value)/100; });
+  pitch.addEventListener('input', e=>{ t.pitch=parseFloat(e.target.value); if (t.source) t.source.playbackRate.value=Math.pow(2,t.pitch/12); });
+  filterSlider.addEventListener('input', e=> t.chain.filter.frequency.value = parseFloat(e.target.value) );
+  filterType.addEventListener('change', e=> t.chain.filter.type = (e.target.value==='off') ? 'allpass' : e.target.value );
+  send.addEventListener('input', e=> t.chain.send.gain.value = parseFloat(e.target.value)/100 );
+
+  lfoOn.addEventListener('change', e=> t.lfoEnabled = e.target.checked );
+  lfoSpeed.addEventListener('input', e=> t.lfoPeriod = Math.max(0.05, parseFloat(e.target.value)) );
+  lfoDepth.addEventListener('input', e=> t.lfoDepth = parseFloat(e.target.value)/100 );
+}
+
+/* LFO PAN engine */
+function loopLfo(){
+  const now = audioCtx.currentTime;
+  for (let i=1;i<=8;i++){
+    const t = tracks[i]; if (!t) continue;
+    const base = t.basePan || 0;
+    let panVal = base;
+    if (t.lfoEnabled && t.lfoPeriod > 0){
+      const s = Math.sin((now * (2*Math.PI / t.lfoPeriod)) + t.lfoPhaseOffset);
+      panVal = base + t.lfoDepth * s;
+      if (panVal > 1) panVal = 1; if (panVal < -1) panVal = -1;
+    }
+    t.chain.pan.pan.value = panVal;
+  }
+  requestAnimationFrame(loopLfo);
+}
+requestAnimationFrame(loopLfo);
+
+/* Crossfade UI hooks */
+q('masterVol').addEventListener('input', e => { masterGain.gain.value = parseFloat(e.target.value)/100; });
+q('masterRev').addEventListener('input', e => { reverbGain.gain.value = parseFloat(e.target.value)/100; });
+
+q('crossfade12').addEventListener('input', e => setPair('12', parseFloat(e.target.value)/100));
+q('crossfade34').addEventListener('input', e => setPair('34', parseFloat(e.target.value)/100));
+q('crossfade56').addEventListener('input', e => setPair('56', parseFloat(e.target.value)/100));
+q('crossfade78').addEventListener('input', e => setPair('78', parseFloat(e.target.value)/100));
+
+startAutoCross('autoCF12','autoCF12Speed', q('crossfade12'), '12');
+startAutoCross('autoCF34','autoCF34Speed', q('crossfade34'), '34');
+startAutoCross('autoCF56','autoCF56Speed', q('crossfade56'), '56');
+startAutoCross('autoCF78','autoCF78Speed', q('crossfade78'), '78');
+
+/* ====== Recorder WebM/WAV ====== */
+const recDot = q('recDot');
+const recStatus = q('recStatus');
+const downloadArea = q('downloadArea');
+
+let recMode = null; // "webm" of "wav"
+let mediaRecorder = null, recordedChunks = [];
+let spNode = null, wavL=[], wavR=[], wavLen=0, wavSR=0;
+
+function supportsWebM(){
+  return typeof MediaRecorder !== 'undefined' &&
+         MediaRecorder.isTypeSupported &&
+         (MediaRecorder.isTypeSupported('audio/webm;codecs=opus') || MediaRecorder.isTypeSupported('audio/webm'));
+}
+function startRecording(){
+  downloadArea.innerHTML = '';
+  if (supportsWebM()){
+    recMode = 'webm';
+    const dest = audioCtx.createMediaStreamDestination();
+    recordBus.connect(dest);
+    try { mediaRecorder = new MediaRecorder(dest.stream, { mimeType: 'audio/webm;codecs=opus' }); }
+    catch(e){ mediaRecorder = new MediaRecorder(dest.stream, { mimeType: 'audio/webm' }); }
+    recordedChunks = [];
+    mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) recordedChunks.push(e.data); };
+    mediaRecorder.onstart = () => { recDot.classList.add('live'); recStatus.textContent = 'Opnemen (WebM/Opus)...'; };
+    mediaRecorder.onstop = () => {
+      recDot.classList.remove('live'); recStatus.textContent = 'Opname gestopt';
+      const blob = new Blob(recordedChunks, {type:'audio/webm'});
+      pushDownload(blob, `mix_${timeStamp()}.webm`);
+    };
+    mediaRecorder.start(250);
+    mediaRecorder._stopCleanup = () => { try{ recordBus.disconnect(dest); }catch(_){} };
+    return;
+  }
+  // WAV fallback
+  recMode = 'wav';
+  recDot.classList.add('live'); recStatus.textContent = 'Opnemen (WAV)...';
+  const bufSize = 4096; wavL=[]; wavR=[]; wavLen=0; wavSR=audioCtx.sampleRate;
+  spNode = audioCtx.createScriptProcessor(bufSize, 2, 2);
+  recordBus.connect(spNode);
+  spNode.onaudioprocess = e => {
+    const L = e.inputBuffer.getChannelData(0).slice(0);
+    const R = e.inputBuffer.numberOfChannels>1 ? e.inputBuffer.getChannelData(1).slice(0) : L;
+    wavL.push(L); wavR.push(R); wavLen += L.length;
+  };
+  spNode.connect(audioCtx.destination);
+}
+function stopRecording(){
+  if (recMode === 'webm'){
+    if (mediaRecorder && mediaRecorder.state !== 'inactive'){
+      mediaRecorder.stop();
+      if (mediaRecorder._stopCleanup) mediaRecorder._stopCleanup();
+    }
+    return;
+  }
+  if (recMode === 'wav'){
+    try { spNode.disconnect(); recordBus.disconnect(spNode); } catch(_) {}
+    if (spNode){ spNode.onaudioprocess = null; spNode = null; }
+    const blob = buildWavFromFloat(wavL, wavR, wavLen, wavSR);
+    recDot.classList.remove('live'); recStatus.textContent = 'Opname gestopt';
+    pushDownload(blob, `mix_${timeStamp()}.wav`);
+    wavL=[]; wavR=[]; wavLen=0;
+  }
+}
+function pushDownload(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.textContent = `Download ${filename}`;
+  downloadArea.innerHTML = '';
+  downloadArea.appendChild(a);
+}
+function timeStamp(){
+  const d = new Date(), p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
+}
+function buildWavFromFloat(chunksL, chunksR, totalLen, sr){
+  const L = mergeFloat32(chunksL, totalLen), R = mergeFloat32(chunksR, totalLen);
+  const pcm16 = interleaveTo16(L, R);
+  const bytesPerSample=2, numChannels=2;
+  const blockAlign=numChannels*bytesPerSample;
+  const byteRate=sr*blockAlign;
+  const dataSize=pcm16.length*bytesPerSample;
+  const buffer=new ArrayBuffer(44+dataSize), view=new DataView(buffer);
+  let off=0;
+  writeStr('RIFF'); write32(36+dataSize); writeStr('WAVE');
+  writeStr('fmt '); write32(16); write16(1); write16(numChannels);
+  write32(sr); write32(byteRate); write16(blockAlign); write16(16);
+  writeStr('data'); write32(dataSize);
+  for(let i=0;i<pcm16.length;i++) view.setInt16(44+i*2, pcm16[i], true);
+  function writeStr(s){ for(let i=0;i<s.length;i++) view.setUint8(off++, s.charCodeAt(i)); }
+  function write16(v){ view.setUint16(off, v, true); off+=2; }
+  function write32(v){ view.setUint32(off, v, true); off+=4; }
+  return new Blob([buffer], {type:'audio/wav'});
+}
+function mergeFloat32(chunks, len){
+  const out=new Float32Array(len); let o=0;
+  for(const c of chunks){ out.set(c, o); o+=c.length; }
+  return out;
+}
+function interleaveTo16(L,R){
+  const n=L.length, out=new Int16Array(n*2);
+  for(let i=0,j=0;i<n;i++,j+=2){
+    const l=Math.max(-1,Math.min(1,L[i]))*0x7fff|0;
+    const r=Math.max(-1,Math.min(1,R[i]))*0x7fff|0;
+    out[j]=l; out[j+1]=r;
+  }
+  return out;
+}
+
+/* ====== Transport ====== */
+q('playAll').addEventListener('click', ()=>{
+  if (audioCtx.state==='suspended') audioCtx.resume();
+  startRecording();
+  const randomOn=q('randomStartOn').checked;
+  const maxOff=parseFloat(q('randomStartMax').value);
+  for (let i=1;i<=8;i++){
+    const t=tracks[i]; if (!t || !t.buffer || t.isPlaying) continue;
+    if (randomOn && t.loop){ const max=Math.min(maxOff, t.buffer.duration); t.pauseOffset=Math.random()*max; } else { t.pauseOffset=0; }
+    document.getElementById('play'+i).click();
+  }
+});
+q('pauseAll').addEventListener('click', ()=>{
+  for (let i=1;i<=8;i++){ const t=tracks[i]; if (t && t.isPlaying) document.getElementById('play'+i).click(); }
+});
+q('stopAll').addEventListener('click', ()=>{
+  for (let i=1;i<=8;i++){ document.getElementById('stop'+i).click(); }
+  stopRecording();
+});
+
+/* ====== Crossfade auto animators ====== */
+startAutoCross('autoCF12','autoCF12Speed', q('crossfade12'), '12');
+startAutoCross('autoCF34','autoCF34Speed', q('crossfade34'), '34');
+startAutoCross('autoCF56','autoCF56Speed', q('crossfade56'), '56');
+startAutoCross('autoCF78','autoCF78Speed', q('crossfade78'), '78');
+
+/* ====== Presets: Save / Load ====== */
+function abToBase64(arrayBuffer){
+  let binary = '';
+  const bytes = new Uint8Array(arrayBuffer);
+  const chunk = 0x8000;
+  for (let i=0;i<bytes.length;i+=chunk){
+    const sub = bytes.subarray(i, i+chunk);
+    binary += String.fromCharCode.apply(null, sub);
+  }
+  return btoa(binary);
+}
+function base64ToAb(b64){
+  const binary = atob(b64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i=0;i<len;i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+function collectTrackState(i){
+  const t = tracks[i];
+  const state = {
+    vol: parseFloat(q('vol'+i).value),
+    pan: parseFloat(q('pan'+i).value),
+    pitch: parseFloat(q('pitch'+i).value),
+    filterFreq: parseFloat(q('filter'+i).value),
+    filterType: q('filterType'+i).value,
+    send: parseFloat(q('send'+i).value),
+    loop: q('loop'+i).checked,
+    lfoOn: q('lfoOn'+i).checked,
+    lfoSpeed: parseFloat(q('lfoSpeed'+i).value),
+    lfoDepth: parseFloat(q('lfoDepth'+i).value),
+    sample: null
+  };
+  if (t.sampleArrayBuffer){
+    state.sample = {
+      name: t.sampleName || ('sample_'+i),
+      mime: t.sampleMime || 'audio/wav',
+      base64: abToBase64(t.sampleArrayBuffer)
+    };
+  }
+  return state;
+}
+
+q('savePreset').addEventListener('click', ()=>{
+  const preset = {
+    version: 1,
+    projectName: q('projectName').value || '',
+    master: {
+      volume: parseFloat(q('masterVol').value),
+      reverb: parseFloat(q('masterRev').value),
+      cf: {
+        '12': parseFloat(q('crossfade12').value),
+        '34': parseFloat(q('crossfade34').value),
+        '56': parseFloat(q('crossfade56').value),
+        '78': parseFloat(q('crossfade78').value),
+        auto: {
+          '12': {on: q('autoCF12').checked, speed: parseFloat(q('autoCF12Speed').value)},
+          '34': {on: q('autoCF34').checked, speed: parseFloat(q('autoCF34Speed').value)},
+          '56': {on: q('autoCF56').checked, speed: parseFloat(q('autoCF56Speed').value)},
+          '78': {on: q('autoCF78').checked, speed: parseFloat(q('autoCF78Speed').value)}
+        }
+      },
+      randomStart: {on: q('randomStartOn').checked, max: parseFloat(q('randomStartMax').value)}
+    },
+    tracks: []
+  };
+  for (let i=1;i<=8;i++) preset.tracks.push(collectTrackState(i));
+  const blob = new Blob([JSON.stringify(preset)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const safeName = (preset.projectName || 'preset') + '_' + timeStamp() + '.json';
+  a.href = url; a.download = safeName; a.click();
+});
+
+q('loadPreset').addEventListener('change', async (ev)=>{
+  const file = ev.target.files[0];
+  if (!file) return;
+  const txt = await file.text();
+  let preset = null;
+  try { preset = JSON.parse(txt); } catch(e){ alert('Kon preset niet lezen'); return; }
+
+  if (preset.projectName) q('projectName').value = preset.projectName;
+  if (preset.master){
+    q('masterVol').value = preset.master.volume ?? 85; masterGain.gain.value = parseFloat(q('masterVol').value)/100;
+    q('masterRev').value = preset.master.reverb ?? 20; reverbGain.gain.value = parseFloat(q('masterRev').value)/100;
+
+    if (preset.master.cf){
+      const cf = preset.master.cf;
+      if (cf['12'] != null){ q('crossfade12').value = cf['12']; setPair('12', cf['12']/100); }
+      if (cf['34'] != null){ q('crossfade34').value = cf['34']; setPair('34', cf['34']/100); }
+      if (cf['56'] != null){ q('crossfade56').value = cf['56']; setPair('56', cf['56']/100); }
+      if (cf['78'] != null){ q('crossfade78').value = cf['78']; setPair('78', cf['78']/100); }
+      if (cf.auto){
+        q('autoCF12').checked = !!cf.auto['12']?.on; q('autoCF12Speed').value = cf.auto['12']?.speed ?? 60;
+        q('autoCF34').checked = !!cf.auto['34']?.on; q('autoCF34Speed').value = cf.auto['34']?.speed ?? 90;
+        q('autoCF56').checked = !!cf.auto['56']?.on; q('autoCF56Speed').value = cf.auto['56']?.speed ?? 75;
+        q('autoCF78').checked = !!cf.auto['78']?.on; q('autoCF78Speed').value = cf.auto['78']?.speed ?? 105;
+      }
+    }
+    if (preset.master.randomStart){
+      q('randomStartOn').checked = !!preset.master.randomStart.on;
+      q('randomStartMax').value = preset.master.randomStart.max ?? 4;
+    }
+  }
+
+  if (Array.isArray(preset.tracks)){
+    for (let i=1;i<=8;i++){
+      const st = preset.tracks[i-1]; if (!st) continue;
+      q('vol'+i).value = st.vol ?? 90; tracks[i].chain.preGain.gain.value = parseFloat(q('vol'+i).value)/100;
+      q('pan'+i).value = st.pan ?? 0; tracks[i].basePan = parseFloat(q('pan'+i).value)/100;
+      q('pitch'+i).value = st.pitch ?? 0; tracks[i].pitch = parseFloat(q('pitch'+i).value);
+      q('filter'+i).value = st.filterFreq ?? 10000; tracks[i].chain.filter.frequency.value = parseFloat(q('filter'+i).value);
+      q('filterType'+i).value = st.filterType ?? 'off'; tracks[i].chain.filter.type = (st.filterType==='off' ? 'allpass' : st.filterType);
+      q('send'+i).value = st.send ?? 30; tracks[i].chain.send.gain.value = parseFloat(q('send'+i).value)/100;
+      q('loop'+i).checked = st.loop ?? true; tracks[i].loop = q('loop'+i).checked;
+      q('lfoOn'+i).checked = st.lfoOn ?? true; tracks[i].lfoEnabled = q('lfoOn'+i).checked;
+      q('lfoSpeed'+i).value = st.lfoSpeed ?? q('lfoSpeed'+i).value; tracks[i].lfoPeriod = parseFloat(q('lfoSpeed'+i).value);
+      q('lfoDepth'+i).value = st.lfoDepth ?? q('lfoDepth'+i).value; tracks[i].lfoDepth = parseFloat(q('lfoDepth'+i).value)/100;
+
+      // sample herstellen
+      const status = q('status'+i);
+      if (st.sample && st.sample.base64){
+        const ab = base64ToAb(st.sample.base64);
+        tracks[i].sampleArrayBuffer = ab;
+        tracks[i].sampleMime = st.sample.mime || 'audio/wav';
+        tracks[i].sampleName = st.sample.name || ('sample_'+i);
+        const buf = await audioCtx.decodeAudioData(ab.slice(0));
+        tracks[i].buffer = buf;
+        status.textContent = tracks[i].sampleName;
+        status.classList.add('loaded');
+      } else {
+        tracks[i].buffer = null;
+        tracks[i].sampleArrayBuffer = null;
+        status.textContent = 'Leeg';
+        status.classList.remove('loaded');
+      }
+    }
+  }
+
+  ev.target.value = ''; // reset file input
+});
+
+q('clearAll').addEventListener('click', ()=>{
+  for (let i=1;i<=8;i++){
+    const t=tracks[i];
+    if (t.source){ try{ t.source.stop(); }catch(_){} t.source.disconnect(); t.source=null; }
+    t.isPlaying=false; t.pauseOffset=0;
+    t.buffer=null; t.sampleArrayBuffer=null; t.sampleMime=null; t.sampleName=null;
+    q('status'+i).textContent='Leeg'; q('status'+i).classList.remove('loaded');
+    q('play'+i).textContent='Play';
+  }
+  downloadArea.innerHTML = '';
+});
+</script>
+</body>
+</html>

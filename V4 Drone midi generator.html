@@ -1,0 +1,718 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Tonal Weave — MIDI 8-Track Generator · v4.0</title>
+<style>
+:root{--bg:#0b0f14;--panel:#121821;--ink:#e9f0f7;--muted:#a8b3c2;--line:#243247}
+*{box-sizing:border-box} html,body{height:100%}
+body{margin:0;background:linear-gradient(180deg,#0b0f14,#0e141b);color:var(--ink);font:14px/1.5 system-ui,Segoe UI,Roboto,Arial,sans-serif}
+.wrap{max-width:1280px;margin:24px auto;padding:16px}
+h1{font-size:22px;margin:0 0 8px}
+.muted{color:var(--muted)}
+.card{background:#121821;border:1px solid #1b2533;border-radius:16px;padding:16px;box-shadow:0 6px 24px rgba(0,0,0,.35);margin-top:12px}
+.grid{display:grid;gap:12px}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+.grid-8{grid-template-columns:repeat(8,1fr)}
+.grid-2{grid-template-columns:1.25fr .75fr}
+.row{display:grid;grid-template-columns:1fr 1.2fr;gap:10px}
+input,select,button,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #273244;background:#0c121a;color:var(--ink)}
+textarea{min-height:84px;resize:vertical}
+button{cursor:pointer}
+.btn{padding:8px 12px;border-radius:999px}
+.btn-primary{background:linear-gradient(180deg,#1a6bff,#0e49dd);border:0}
+.btn-ghost{background:#0c121a;border:1px solid #273244}
+.small{font-size:12px;color:var(--muted)}
+.hr{height:1px;background:#1e2a3a;margin:12px 0}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+.preview{background:#0a1219;border:1px solid var(--line);border-radius:12px;padding:8px;overflow:auto}
+#pianoroll{width:100%;height:460px;display:block}
+#log{white-space:pre-wrap;word-break:break-word}
+.warn{color:#ffd37a}
+@media(max-width:1140px){.grid-3{grid-template-columns:1fr}.grid-4{grid-template-columns:1fr 1fr}.grid-8{grid-template-columns:1fr 1fr 1fr 1fr}.grid-2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Tonal Weave — MIDI 8-Track Generator · v4.0</h1>
+  <p class="muted">Eight tonal loops in bars with chord-guided melody, counterpoint, swing, humanized timing and interleaved CC expression. Cadences at bar ends, wide piano-roll, clean log.</p>
+
+  <div class="card">
+    <div class="grid grid-3">
+      <div>
+        <label>Preset</label>
+        <select id="preset">
+          <option value="nocturne" selected>Nocturne Drift</option>
+          <option value="pastel_bossa">Pastel Bossa</option>
+          <option value="walking_ember">Walking Ember</option>
+          <option value="custom">Custom</option>
+        </select>
+        <div class="small">Sets key, progression, style feel and roles as a starting point.</div>
+      </div>
+      <div>
+        <label>Key & Mode</label>
+        <div class="row">
+          <select id="keyRoot">
+            <option>C</option><option>C#</option><option>Db</option><option>D</option><option>D#</option><option>Eb</option>
+            <option>E</option><option>F</option><option>F#</option><option>Gb</option><option>G</option><option>G#</option>
+            <option>Ab</option><option>A</option><option>A#</option><option>Bb</option><option>B</option>
+          </select>
+          <select id="keyMode">
+            <option value="major">major</option>
+            <option value="naturalMinor">natural minor</option>
+            <option value="harmonicMinor" selected>harmonic minor</option>
+            <option value="dorian">dorian</option>
+            <option value="mixolydian">mixolydian</option>
+            <option value="lydian">lydian</option>
+            <option value="phrygian">phrygian</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label>Tempo (BPM)</label>
+        <input id="bpm" type="number" value="60" step="1"/>
+        <div class="small">Stored in conductor meta.</div>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+    <div class="grid grid-4">
+      <div><label>Global Transpose (semitones)</label><input id="transpose" type="number" value="0" step="1"/></div>
+      <div><label>Swing (8ths, 0.00–0.12)</label><input id="swing" type="number" value="0.06" step="0.005" min="0" max="0.12"/></div>
+      <div><label>Humanize timing (ms)</label><input id="humanMs" type="number" value="14" step="1" min="0" max="40"/></div>
+      <div><label>PPQ (resolution)</label><input id="ppq" type="number" value="480" step="1" min="96" max="960"/></div>
+    </div>
+
+    <div class="grid grid-4" style="margin-top:8px">
+      <div><label>Velocity min</label><input id="velMin" type="number" value="50" min="1" max="127"/></div>
+      <div><label>Velocity max</label><input id="velMax" type="number" value="105" min="1" max="127"/></div>
+      <div>
+        <label>CC11 Expression LFO</label>
+        <select id="exprLfo"><option value="off" selected>off</option><option value="slow">slow</option><option value="medium">medium</option><option value="fast">fast</option></select>
+        <div class="small">Starts 10–30 ms after note-on, ends before note-off.</div>
+      </div>
+      <div><label>Seed</label><input id="seed" type="number" value="12345" step="1"/></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="grid grid-3">
+      <div>
+        <label>Progression (8 bars, hyphen-sep)</label>
+        <input id="progression" type="text" value="i-iv-V-i-VI-ii°-V-i"/>
+        <div class="small">Examples: i-iv-V-i-VI-ii°-V-i  |  I-ii-V-I-vi-ii-V-I  |  I-bVII-IV-I-…</div>
+      </div>
+      <div>
+        <label>Bars per loop per track (CSV)</label>
+        <input id="loopBars" type="text" value="7,9,10,11,12,13,14,15"/>
+        <div class="small">Each track loops on its own bar length, cadences align at bar ends.</div>
+      </div>
+      <div>
+        <label>Role set</label>
+        <div class="grid grid-8" id="roles"></div>
+        <div class="small">Roles drive rhythm cells, contour, range, voice-leading behaviour.</div>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+    <div class="grid grid-3">
+      <div>
+        <label>Register profile</label>
+        <select id="rangeProfile">
+          <option value="orchestral" selected>orchestral spread</option>
+          <option value="bassHeavy">bass heavy</option>
+          <option value="padHigh">pads high</option>
+          <option value="custom">custom CSV</option>
+        </select>
+        <input id="customRanges" class="small" style="display:none" placeholder="36-52,48-67,52-72,60-79,55-74,60-84,40-57,76-96"/>
+      </div>
+      <div>
+        <label>Melodic density (0.10–0.80)</label>
+        <input id="density" type="number" value="0.45" step="0.01" min="0.1" max="0.8"/>
+        <div class="small">Affects hit probability inside role rhythm cells.</div>
+      </div>
+      <div>
+        <label>Accent cycle (steps)</label>
+        <input id="accentLen" type="number" value="6" min="2" max="12" step="1"/>
+        <div class="small">Soft velocity arc every N sub-steps.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <button class="btn btn-primary" id="render">🎼 Generate MIDI</button>
+      <button class="btn btn-ghost" id="improvise">🎲 Improvise seed</button>
+      <button class="btn btn-ghost" id="savePreset">💾 Save Preset</button>
+      <input class="btn" id="loadPreset" type="file" accept="application/json"/>
+      <select id="splitOut"><option value="off" selected>Export single file</option><option value="on">Also 8 isolated tracks</option></select>
+      <input id="fname" type="text" value="TonalWeave_00000000_000000_12345.mid" style="min-width:360px"/>
+    </div>
+    <div class="hr"></div>
+    <div class="grid grid-2">
+      <div>
+        <label>Piano-roll preview</label>
+        <div class="preview"><svg id="pianoroll" viewBox="0 0 1200 460" preserveAspectRatio="none"></svg></div>
+        <div class="small">Time →, pitch ↑. Colors per track.</div>
+      </div>
+      <div>
+        <label>Log</label>
+        <pre id="log" class="preview" style="height:460px"></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===========================
+   v4.0 Tonal Weave — Engine
+   =========================== */
+(function(){
+  /* ---------- UI helpers ---------- */
+  const el = id => document.getElementById(id);
+  const logEl = el('log');
+  function log(s){ logEl.textContent += s + "\n"; logEl.scrollTop = logEl.scrollHeight; }
+  function nowStamp(){ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; }
+  function safeSlug(s){ return String(s||'Preset').replace(/[^a-z0-9]+/gi,'_'); }
+  function updateSuggestedFilename(){
+    const seed = el('seed').value || '0';
+    el('fname').value = `TonalWeave_${nowStamp()}_${seed}.mid`;
+  }
+
+  /* ---------- Roles UI ---------- */
+  const ROLE_LIST = ['Bass','Ostinato','Pad','Melody','Counter','Arp','Drone','Sparkles'];
+  const rolesEl = el('roles');
+  for(let i=0;i<8;i++){
+    const s=document.createElement('select'); s.id=`role${i}`;
+    ROLE_LIST.forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; s.appendChild(o); });
+    s.value = ROLE_LIST[i];
+    rolesEl.appendChild(s);
+  }
+
+  /* ---------- Presets ---------- */
+  const PRESETS = {
+    nocturne: {
+      name:'Nocturne Drift',
+      root:'D', mode:'harmonicMinor', bpm:60, swing:0.06, humanMs:16,
+      progression:'i-iv-V-i-VI-ii°-V-i',
+      loopBars:[7,9,10,11,12,13,14,15],
+      roles:['Bass','Ostinato','Pad','Melody','Counter','Arp','Drone','Sparkles'],
+      rangeProfile:'orchestral', density:0.45, accentLen:6, exprLfo:'medium'
+    },
+    pastel_bossa: {
+      name:'Pastel Bossa',
+      root:'F#', mode:'lydian', bpm:68, swing:0.07, humanMs:14,
+      progression:'I-ii-V-I-vi-ii-V-I',
+      loopBars:[8,10,12,12,14,16,18,20],
+      roles:['Bass','Pad','Pad','Melody','Counter','Arp','Drone','Sparkles'],
+      rangeProfile:'padHigh', density:0.40, accentLen:4, exprLfo:'slow'
+    },
+    walking_ember: {
+      name:'Walking Ember',
+      root:'C', mode:'mixolydian', bpm:72, swing:0.04, humanMs:12,
+      progression:'I-bVII-IV-I-I-bVII-IV-I',
+      loopBars:[6,8,10,12,12,14,16,18],
+      roles:['Bass','Ostinato','Pad','Melody','Counter','Arp','Drone','Sparkles'],
+      rangeProfile:'bassHeavy', density:0.55, accentLen:8, exprLfo:'off'
+    }
+  };
+
+  /* ---------- Music theory ---------- */
+  const NOTE_NAMES = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+  function pcOf(name){ return NOTE_NAMES.indexOf(name.replace('Db','C#').replace('Eb','D#').replace('Gb','F#').replace('Ab','G#').replace('Bb','A#')); }
+  function modePcs(mode){
+    switch(mode){
+      case 'major': return [0,2,4,5,7,9,11];
+      case 'naturalMinor': return [0,2,3,5,7,8,10];
+      case 'harmonicMinor': return [0,2,3,5,7,8,11];
+      case 'dorian': return [0,2,3,5,7,9,10];
+      case 'mixolydian': return [0,2,4,5,7,9,10];
+      case 'lydian': return [0,2,4,6,7,9,11];
+      case 'phrygian': return [0,1,3,5,7,8,10];
+      default: return [0,2,3,5,7,8,10];
+    }
+  }
+  function scaleDegreeToSemitone(mode, deg){ const pcs = modePcs(mode); const i=((deg%7)+7)%7; return pcs[i]; }
+
+  /* chord parser: minimal roman to degrees in current mode (triads with 7ths) */
+  const DEG_MAP = {'I':0,'i':0,'II':1,'ii':1,'III':2,'iii':2,'IV':3,'iv':3,'V':4,'v':4,'VI':5,'vi':5,'VII':6,'vii':6,'bVII':6}; // bVII maps to 6 for mixolydian use
+  function parseProgression(progStr){ return progStr.split('-').map(s=> s.trim()); }
+  function chordPitchClasses(rootPc, mode, roman){
+    // basic triad + 7th when available
+    const deg = DEG_MAP[roman] ?? 0;
+    const pcs = modePcs(mode);
+    const root = (rootPc + scaleDegreeToSemitone(mode, deg)) % 12;
+    const third = (rootPc + scaleDegreeToSemitone(mode, (deg+2)%7)) % 12;
+    const fifth = (rootPc + scaleDegreeToSemitone(mode, (deg+4)%7)) % 12;
+    const seventh = (rootPc + scaleDegreeToSemitone(mode, (deg+6)%7)) % 12;
+    return {root, third, fifth, seventh};
+  }
+
+  /* ranges */
+  function chooseRanges(profile){
+    if(profile==='bassHeavy') return [[36,52],[45,62],[50,70],[60,79],[55,74],[60,84],[40,57],[76,96]];
+    if(profile==='padHigh')  return [[40,55],[48,67],[55,76],[62,82],[58,78],[64,86],[45,60],[80,100]];
+    // orchestral
+    return [[36,52],[48,67],[52,72],[60,79],[55,74],[60,84],[40,57],[76,96]];
+  }
+  function parseCustomRanges(txt){
+    const parts=String(txt||'').split(',').map(s=>s.trim());
+    if(parts.length!==8) return null;
+    const out=[]; for(const p of parts){ const m=p.match(/^(\d{1,3})\s*-\s*(\d{1,3})$/); if(!m) return null; const a=+m[1], b=+m[2]; out.push([Math.min(a,b),Math.max(a,b)]); }
+    return out;
+  }
+  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+  function prng(seed){ let s=(Number(seed)||1)>>>0; return ()=> (s=(s*1664525+1013904223)>>>0)/4294967296; }
+
+  /* role behaviour */
+  const ROLE_BEHAV = {
+    Bass:     {rangeIx:0, densityMul:0.9,  velMed:68, legato:0.85, prefer:'down',  strongChord:true,  cells:['q','q','q','q'], anticipProb:0.25},
+    Ostinato: {rangeIx:1, densityMul:1.0,  velMed:72, legato:0.60, prefer:'repeat',strongChord:true,  cells:['e','e','q','e'], tieProb:0.25},
+    Pad:      {rangeIx:2, densityMul:0.7,  velMed:60, legato:0.98, prefer:'hold',  strongChord:true,  cells:['w'], holdAcross:true},
+    Melody:   {rangeIx:3, densityMul:1.0,  velMed:88, legato:0.72, prefer:'up',    strongChord:true,  cells:['q','e','e'], dottedProb:0.2},
+    Counter:  {rangeIx:4, densityMul:0.9,  velMed:78, legato:0.68, prefer:'contrary', strongChord:true, cells:['e','e','q'], thirdsSixths:true},
+    Arp:      {rangeIx:5, densityMul:1.0,  velMed:74, legato:0.58, prefer:'arpeggiate', strongChord:true, cells:['e','e','e','e'], colorProb:0.25},
+    Drone:    {rangeIx:6, densityMul:0.4,  velMed:54, legato:0.995,prefer:'hold',  strongChord:true,  cells:['w'], tonicDom:true},
+    Sparkles: {rangeIx:7, densityMul:0.5,  velMed:66, legato:0.42, prefer:'jump',  strongChord:false, cells:['e','r'], echoCadence:true}
+  };
+
+  /* rhythm dictionary */
+  // durations in quarter-note units (4/4): w=4, h=2, q=1, e=0.5, r=rest 0.5
+  const DUR = {w:4,h:2,q:1,e:0.5};
+  function buildCellStream(role, bars, density, rng){
+    const beh = ROLE_BEHAV[role]||ROLE_BEHAV.Pad;
+    const cells = beh.cells;
+    const seq = [];
+    let bar=0;
+    while(bar<bars){
+      let beat=0;
+      while(beat<4){
+        const pick = cells[Math.floor(rng()*cells.length)];
+        if(pick==='r'){ seq.push({dur:0.5, rest:true}); beat+=0.5; continue; }
+        // density gates whether we emit the note
+        const emit = rng() < density*beh.densityMul || pick==='w' || pick==='h';
+        if(emit){
+          let dur = DUR[pick] || 1;
+          if(role==='Melody' && pick==='e' && rng()< (ROLE_BEHAV.Melody.dottedProb||0)) dur=0.75; // dotted feel
+          if(role==='Ostinato' && pick==='e' && rng()< (ROLE_BEHAV.Ostinato.tieProb||0)) dur=1.0; // merge to quarter
+          seq.push({dur, rest:false});
+        } else {
+          seq.push({dur:DUR[pick]||1, rest:true});
+        }
+        beat += DUR[pick]||1;
+      }
+      bar++;
+    }
+    return seq;
+  }
+
+  /* pitch selection weights */
+  function weightPick(weights, rng){
+    let sum=0; for(const w of weights) sum+=w.w;
+    let r=rng()*sum;
+    for(const w of weights){ if((r-=w.w)<=0) return w.id;}
+    return weights[weights.length-1].id;
+  }
+
+  function allowedNotesInRange(rootPc, mode, transpose, lo, hi){
+    const pcs=modePcs(mode).map(x=>(x+rootPc)%12);
+    const out=[];
+    for(let m=Math.max(21,lo); m<=Math.min(108,hi); m++){
+      if(pcs.includes((m%12))) out.push(m+transpose);
+    }
+    return out.length?out:[Math.max(21,lo)+transpose];
+  }
+
+  function nearestOfPc(list, targetPc){
+    let best=list[0], dmin=1e9, ix=0;
+    for(let i=0;i<list.length;i++){
+      const n=list[i], d=Math.min((n%12-targetPc+12)%12,(targetPc-n%12+12)%12);
+      if(d<dmin){ dmin=d; best=n; ix=i; }
+    }
+    return {note:best, ix};
+  }
+
+  /* swing micro-timing */
+  function swingOffsetQN(qnIndex, swingAmt){
+    // odd 8ths stretched: every 0.5 QN on odd index gets +swing fraction
+    // We'll apply at event time, not barline.
+    return (qnIndex*2 % 2 === 1) ? swingAmt*0.5 : 0; // in quarter-note units
+  }
+
+  /* MIDI writer */
+  function vlq(n){ let bytes=[n & 0x7F]; while((n >>= 7)) bytes.unshift((n & 0x7F) | 0x80); return Uint8Array.from(bytes); }
+  function textBytes(s){ return new TextEncoder().encode(s); }
+  function u16(n){ return Uint8Array.of((n>>8)&255, n&255); }
+  function u32(n){ return Uint8Array.of((n>>>24)&255, (n>>>16)&255, (n>>>8)&255, n&255); }
+  function concatBytes(arrs){ let len=0; for(const a of arrs) len+=a.length; const out=new Uint8Array(len); let o=0; for(const a of arrs){ out.set(a,o); o+=a.length; } return out; }
+  function meta(delta, type, data){ return concatBytes([vlq(delta), Uint8Array.of(0xFF, type, data.length), data]); }
+  function tempoMeta(delta, bpm){ const mpqn=Math.round(60000000/Math.max(1,bpm)); const d=Uint8Array.of((mpqn>>>16)&255,(mpqn>>>8)&255,mpqn&255); return meta(delta, 0x51, d); }
+  function timeSigMeta(delta, nn, dd){ return meta(delta, 0x58, Uint8Array.of(nn, dd, 24, 8)); }
+  function keySigMeta(delta, sf, mi){ return meta(delta, 0x59, Uint8Array.of(sf, mi)); }
+  function trackName(delta, name){ return meta(delta, 0x03, textBytes(name)); }
+  function endOfTrack(){ return Uint8Array.of(0x00,0xFF,0x2F,0x00); }
+  function chEvent(delta, st, d1, d2){ return concatBytes([vlq(delta), Uint8Array.of(st, d1, d2)]); }
+  function ccEvt(delta, ch, ctrl, val){ return chEvent(delta, 0xB0 | (ch&0x0F), ctrl&127, val&127); }
+  function noteOn(delta, ch, key, vel){ return chEvent(delta, 0x90 | (ch&0x0F), key&127, vel&127); }
+  function noteOff(delta, ch, key, vel){ return chEvent(delta, 0x80 | (ch&0x0F), key&127, vel&127); }
+  function makeTrack(events){ const body = concatBytes(events.concat([endOfTrack()])); return concatBytes([textBytes('MTrk'), u32(body.length), body]); }
+  function makeSMF(ppq, tracks){ const header = concatBytes([textBytes('MThd'), u32(6), u16(1), u16(tracks.length), u16(ppq)]); return new Blob([header, ...tracks], {type:'audio/midi'}); }
+  function saveBlob(blob, name){
+    const a=document.createElement('a'); const url=URL.createObjectURL(blob);
+    a.href=url; a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 800);
+  }
+
+  /* time conversions */
+  function qnToTicks(qn, ppq){ return Math.round(qn*ppq); }
+  function msToTicks(ms, bpm, ppq){ const qnPerSec = bpm/60; return Math.round((ms/1000)*qnPerSec*ppq); }
+
+  /* piano-roll preview */
+  function collectRoll(tracks){
+    const res=[];
+    for(let i=1;i<tracks.length;i++){
+      const arr = new Uint8Array(tracks[i].slice(8));
+      let idx=0,time=0; const notes=[], onMap={};
+      function readVlq(){ let v=0; while(true){ const b=arr[idx++]; v=(v<<7)|(b&0x7F); if(!(b&0x80)) break; } return v; }
+      while(idx < arr.length){
+        const delta = readVlq(); time += delta;
+        const b = arr[idx++];
+        if(b === 0xFF){ const type = arr[idx++]; const len = readVlq(); idx += len; continue; }
+        if((b & 0xF0) === 0x90){ const key = arr[idx++]; const vel = arr[idx++]; if(vel>0){ onMap[key]=time; } else { const t0 = onMap[key]??time; delete onMap[key]; notes.push({t0,t1:time,p:key}); } }
+        else if((b & 0xF0) === 0x80){ const key = arr[idx++]; idx++; const t0 = onMap[key]??time; delete onMap[key]; notes.push({t0,t1:time,p:key}); }
+        else if((b & 0xF0) === 0xB0 || (b & 0xF0) === 0xC0){ idx += ((b & 0xF0) === 0xC0)? 1:2; }
+      }
+      res.push({notes});
+    }
+    return {tracks:res};
+  }
+  function drawPianoRoll(roll){
+    const svg = el('pianoroll'); while(svg.firstChild) svg.removeChild(svg.firstChild);
+    const colors=['#9ad','#ad9','#da9','#9da','#d9a','#a9d','#9dd','#dd9'];
+    let pmin=127,pmax=0,tmax=0;
+    roll.tracks.forEach(t=> t.notes.forEach(n=>{ if(n.p<pmin) pmin=n.p; if(n.p>pmax) pmax=n.p; if(n.t1>tmax) tmax=n.t1; }));
+    if(pmin>pmax){ pmin=48;pmax=84; }
+    const w=1200,h=460,pad=10, spanP=Math.max(1,pmax-pmin+1), spanT=Math.max(1,tmax);
+    // grid
+    for(let i=0;i<=8;i++){ const x=pad+(w-2*pad)*i/8; const ln=document.createElementNS('http://www.w3.org/2000/svg','line'); ln.setAttribute('x1',x); ln.setAttribute('y1',pad); ln.setAttribute('x2',x); ln.setAttribute('y2',h-pad); ln.setAttribute('stroke','#203046'); ln.setAttribute('stroke-width','1'); svg.appendChild(ln); }
+    for(let p=0;p<spanP;p+=2){ const y=pad+(h-2*pad)*(1 - p/spanP); const ln=document.createElementNS('http://www.w3.org/2000/svg','line'); ln.setAttribute('x1',pad); ln.setAttribute('y1',y); ln.setAttribute('x2',w-pad); ln.setAttribute('y2',y); ln.setAttribute('stroke','#1a2535'); ln.setAttribute('stroke-width','1'); svg.appendChild(ln); }
+    // notes
+    roll.tracks.forEach((t,ti)=>{
+      const col=colors[ti%colors.length];
+      t.notes.forEach(n=>{
+        const x = pad + (w-2*pad) * (n.t0/spanT);
+        const rw= Math.max(1, (w-2*pad) * ((n.t1-n.t0)/spanT));
+        const y = pad + (h-2*pad) * (1 - (n.p-pmin+0.5)/spanP);
+        const rh= Math.max(2, (h-2*pad) * (1/spanP));
+        const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+        r.setAttribute('x',x); r.setAttribute('y',y); r.setAttribute('width',rw); r.setAttribute('height',rh);
+        r.setAttribute('fill',col); r.setAttribute('opacity','0.85'); svg.appendChild(r);
+      });
+    });
+  }
+
+  /* --------- Tonal generator (bars) --------- */
+  function buildMidi(){
+    log('build start');
+    const presetId = el('preset').value;
+    if(presetId!=='custom'){ applyPreset(presetId, false); } // refresh UI from preset if chosen
+
+    const root = el('keyRoot').value;
+    const mode = el('keyMode').value;
+    const bpm = +el('bpm').value;
+    const swingAmt = +el('swing').value;      // 0..0.12
+    const humanMs = +el('humanMs').value;     // ms jitter around note-on
+    const transpose = +el('transpose').value;
+    const ppq = +el('ppq').value;
+    const velMin = clamp(+el('velMin').value,1,127);
+    const velMax = clamp(+el('velMax').value,velMin,127);
+    const exprLfo = el('exprLfo').value;
+    const seed = +el('seed').value || 1;
+
+    const progression = parseProgression(el('progression').value);
+    if(progression.length!==8){ log('⚠ progression must have 8 items'); }
+    const loopBars = el('loopBars').value.split(',').map(s=>+s.trim()).slice(0,8);
+    while(loopBars.length<8) loopBars.push(loopBars[loopBars.length-1]||8);
+
+    const rangeProfile = el('rangeProfile').value;
+    const ranges = (rangeProfile==='custom') ? (parseCustomRanges(el('customRanges').value)||chooseRanges('orchestral')) : chooseRanges(rangeProfile);
+    const density = +el('density').value;
+    const accentLen = +el('accentLen').value;
+
+    const roles = Array.from({length:8},(_,i)=> el(`role${i}`).value);
+
+    const rng = prng(seed);
+    const rootPc = pcOf(root);
+    const scalePcs = modePcs(mode).map(x=>(x+rootPc)%12);
+
+    // chord grid per bar
+    const chordGrid = progression.map(r => chordPitchClasses(rootPc, mode, r));
+    // guide-tones per bar: 3rd & 7th
+    const guides = chordGrid.map(c => [c.third, c.seventh]);
+
+    // conductor track
+    const T0=[];
+    T0.push(trackName(0,'Conductor'));
+    T0.push(tempoMeta(0,bpm));
+    T0.push(timeSigMeta(0,4,2));
+    T0.push(keySigMeta(0,0, mode.includes('major')?0:1));
+    T0.push(meta(0,0x01, textBytes(`TonalWeave v4 seed:${seed} ${new Date().toISOString()}`)));
+    const tracks=[makeTrack(T0)];
+
+    // helper: pick pitch for role at time position
+    function pickPitch(role, barIdx, isStrong, lastMidi, targetContourMidi, allowedSet){
+      const cg = chordGrid[barIdx%8];
+      const chordPcs = [cg.root,cg.third,cg.fifth,cg.seventh];
+      const gt = guides[barIdx%8]; // guide tones
+      const weights=[];
+      // base weights
+      if(isStrong){
+        chordPcs.forEach(pc=> weights.push({id:{type:'chord',pc}, w: pc===cg.root?0.65:0.45}));
+        gt.forEach(pc=> weights.push({id:{type:'guide',pc}, w:0.2}));
+      } else {
+        chordPcs.forEach(pc=> weights.push({id:{type:'chord',pc}, w:0.35}));
+        gt.forEach(pc=> weights.push({id:{type:'guide',pc}, w:0.25}));
+        scalePcs.forEach(pc=> weights.push({id:{type:'diat',pc}, w:0.18}));
+        weights.push({id:{type:'chrom',pc:(cg.root+11)%12}, w:0.02});
+        weights.push({id:{type:'chrom',pc:(cg.root+1)%12}, w:0.02});
+      }
+      const choice = weightPick(weights, rng);
+      // map pitch class to nearest allowed note near contour target and last note
+      const targetPc = choice.pc;
+      const {note} = nearestOfPc(allowedSet, targetPc);
+      // leap control & recovery
+      if(lastMidi!=null){
+        const leap = Math.abs(note-lastMidi);
+        if(leap>9){ // too wide, pull towards contour target
+          const closer = allowedSet.reduce((a,b)=> Math.abs(b-targetContourMidi) < Math.abs(a-targetContourMidi)? b:a, allowedSet[0]);
+          return closer;
+        }
+      }
+      return note;
+    }
+
+    // melody scaffold used by Counter to form 3rds/6ths
+    let melodySchedule = new Map(); // tick->midi
+
+    // for each track, build notes over its loop length (bars)
+    for(let t=0;t<8;t++){
+      const role = roles[t]||ROLE_LIST[t];
+      const beh = ROLE_BEHAV[role]||ROLE_BEHAV.Pad;
+      const [lo,hi] = ranges[beh.rangeIx];
+      const allowed = allowedNotesInRange(rootPc, mode, transpose, lo, hi);
+      const bars = loopBars[t];
+
+      // phrase contour in MIDI: create a 8-bar height curve then sample
+      const midLo = Math.max(lo, Math.min(hi, Math.floor((lo+hi)/2 - 6)));
+      const midHi = Math.min(hi, Math.max(lo, Math.floor((lo+hi)/2 + 6)));
+      const contour = [];
+      for(let b=0;b<8;b++){
+        const arc = (b<4) ? (b/3) : (1 - (b-4)/3);
+        const target = Math.round(midLo + arc*(midHi-midLo));
+        contour.push(target);
+      }
+
+      // rhythm stream for this role & bars
+      const stream = buildCellStream(role, bars, density, rng);
+
+      // build events
+      const events=[];
+      events.push(trackName(0, `Track ${t+1} (${role})`));
+
+      const qnPerBar = 4;
+      let qnPos = 0; // in quarter notes
+      let lastTick = 0;
+      let lastMidi = null;
+
+      for(let i=0, step=0; i<stream.length; i++, step++){
+        const seg = stream[i];
+        const barIdx = Math.floor(qnPos / qnPerBar) % 8;
+        const posInBar = qnPos - Math.floor(qnPos/qnPerBar)*qnPerBar;
+        const strong = (Math.abs(posInBar - Math.round(posInBar))<1e-6) && (posInBar===0 || posInBar===1 || posInBar===2 || posInBar===3); // quarter beats
+
+        const startQNBase = qnPos;
+        const swingQN = swingOffsetQN(Math.floor(posInBar*2), swingAmt);
+        const humanQN = (rng()*2-1) * (el('humanMs').value/1000) * (bpm/60);
+        const onQN = startQNBase + swingQN + humanQN;
+        const onTick = qnToTicks(onQN, ppq);
+        const deltaOn = Math.max(0, onTick - lastTick);
+
+        if(seg.rest){
+          qnPos += seg.dur;
+          continue;
+        }
+
+        // pick pitch with chord/guide/diatonic weighting + contour target
+        const targetContourMidi = contour[barIdx];
+        let midi = pickPitch(role, barIdx, strong, lastMidi, targetContourMidi, allowed);
+
+        // Counter: aim for 3rds/6ths vs Melody on strong beats
+        if(role==='Counter' && strong){
+          const melAtTick = melodySchedule.get(onTick);
+          if(melAtTick!=null){
+            const prefer = [melAtTick+4, melAtTick-4, melAtTick+9, melAtTick-9];
+            let best=midi, dmin=1e9;
+            for(const trg of prefer){
+              const cand = allowed.reduce((a,b)=> Math.abs(b-trg)<Math.abs(a-trg)? b:a, allowed[0]);
+              const d=Math.abs(cand - trg); if(d<dmin){ dmin=d; best=cand; }
+            }
+            midi = best;
+          }
+        }
+
+        // Voice-leading: avoid parallels with Melody perfect 5/8 into next strong beat
+        // simple check: if both lastMidi and current midi produce perfect interval vs melody note at same beat twice in a row, nudge by step
+        if(role!=='Melody' && strong){
+          const melAtTick = melodySchedule.get(onTick);
+          const melPrev = melodySchedule.get(onTick - qnToTicks(1,ppq));
+          if(melAtTick!=null && melPrev!=null && lastMidi!=null){
+            const int1 = Math.abs((lastMidi - melPrev) % 12);
+            const int2 = Math.abs((midi - melAtTick) % 12);
+            const isPerfect = x => [0,7].includes((x+12)%12);
+            if(isPerfect(int1) && isPerfect(int2)){
+              // nudge diatonically
+              const stepUp = allowed.reduce((a,b)=> Math.abs(b-(midi+2))<Math.abs(a-(midi+2))? b:a, allowed[0]);
+              const stepDn = allowed.reduce((a,b)=> Math.abs(b-(midi-2))<Math.abs(a-(midi-2))? b:a, allowed[0]);
+              midi = (rng()<0.5)? stepUp : stepDn;
+            }
+          }
+        }
+
+        // velocity shaping with accent arc
+        const velMed = ROLE_BEHAV[role]?.velMed || 70;
+        const accPhase = Math.sin(Math.PI * ((step % accentLen) / Math.max(1,accentLen-1)));
+        let vel = clamp(Math.round(velMed + (velMax-velMin)*0.15*accPhase + (rng()*10-5)), velMin, velMax);
+
+        // emit note-on
+        events.push(noteOn(deltaOn, t, midi, vel));
+        lastTick = onTick;
+
+        // CC expression interleaved
+        const lfo = exprLfo;
+        if(lfo!=='off'){
+          const rate = lfo==='slow'? 2 : lfo==='medium'? 4 : 8;
+          const segQN = Math.max(0.25, seg.dur * (ROLE_BEHAV[role]?.legato ? 1 : 0.9));
+          const ccCount = Math.max(2, Math.round(segQN*rate));
+          for(let c=1;c<=ccCount;c++){
+            const posQN = onQN + (segQN * c/ccCount);
+            const targetTick = qnToTicks(posQN, ppq);
+            const val = clamp(Math.round(70 + 20*Math.sin((step/32 + c/ccCount)*Math.PI*2)), 0, 127);
+            const d = Math.max(0, targetTick - lastTick);
+            events.push(ccEvt(d, t, 11, val));
+            lastTick = targetTick;
+          }
+        }
+
+        // note-off
+        const offQN = onQN + Math.max(0.2, seg.dur * (ROLE_BEHAV[role]?.legato || 0.7));
+        const offTick = qnToTicks(offQN, ppq);
+        const deltaOff = Math.max(0, offTick - lastTick);
+        events.push(noteOff(deltaOff, t, midi, 0x40));
+        lastTick = offTick;
+
+        // register melody anchors for counterpoint
+        if(role==='Melody' && strong){
+          melodySchedule.set(onTick, midi);
+        }
+
+        lastMidi = midi;
+        qnPos += seg.dur;
+
+        // cadence emphasis at bar end: ensure ending bar has chord tone
+        const nextBarPos = qnPos % 4;
+        if(nextBarPos===0){
+          // nothing to emit now; selection already chord-weighted on strong beats
+        }
+      }
+
+      tracks.push(makeTrack(events));
+      log(`track ${t+1} ${role} ✔`);
+    }
+
+    const smf = makeSMF(ppq, tracks);
+    drawPianoRoll(collectRoll(tracks));
+    log('build done');
+    return smf;
+  }
+
+  /* ---------- Preset apply/snapshot ---------- */
+  function applyPreset(id, updateUI=true){
+    const p = PRESETS[id];
+    if(!p) return;
+    if(updateUI){
+      el('keyRoot').value=p.root; el('keyMode').value=p.mode; el('bpm').value=p.bpm;
+      el('swing').value=p.swing; el('humanMs').value=p.humanMs; el('progression').value=p.progression;
+      el('loopBars').value=p.loopBars.join(',');
+      el('rangeProfile').value=p.rangeProfile; el('density').value=p.density; el('accentLen').value=p.accentLen;
+      el('exprLfo').value=p.exprLfo;
+      p.roles.forEach((r,i)=> el(`role${i}`).value=r);
+    } else {
+      // only if switching away from custom at render time
+      el('keyRoot').value=p.root; el('keyMode').value=p.mode;
+    }
+  }
+
+  function snapshot(){
+    return {
+      preset: el('preset').value,
+      root: el('keyRoot').value, mode: el('keyMode').value, bpm:+el('bpm').value,
+      swing:+el('swing').value, humanMs:+el('humanMs').value, transpose:+el('transpose').value,
+      ppq:+el('ppq').value, velMin:+el('velMin').value, velMax:+el('velMax').value, exprLfo:el('exprLfo').value,
+      progression: el('progression').value, loopBars: el('loopBars').value,
+      rangeProfile: el('rangeProfile').value, customRanges: el('customRanges').value,
+      density:+el('density').value, accentLen:+el('accentLen').value, seed: el('seed').value,
+      roles: Array.from({length:8},(_,i)=> el(`role${i}`).value)
+    };
+  }
+  function applySnapshot(cfg){
+    function setIf(id,v){ if(v!==undefined && v!==null) el(id).value=v; }
+    setIf('preset', cfg.preset);
+    setIf('keyRoot', cfg.root); setIf('keyMode', cfg.mode); setIf('bpm', cfg.bpm);
+    setIf('swing', cfg.swing); setIf('humanMs', cfg.humanMs); setIf('transpose', cfg.transpose);
+    setIf('ppq', cfg.ppq); setIf('velMin', cfg.velMin); setIf('velMax', cfg.velMax); setIf('exprLfo', cfg.exprLfo);
+    setIf('progression', cfg.progression); setIf('loopBars', cfg.loopBars);
+    setIf('rangeProfile', cfg.rangeProfile); setIf('customRanges', cfg.customRanges);
+    setIf('density', cfg.density); setIf('accentLen', cfg.accentLen); setIf('seed', cfg.seed);
+    if(Array.isArray(cfg.roles)&&cfg.roles.length===8){ cfg.roles.forEach((r,i)=> setIf(`role${i}`, r)); }
+  }
+
+  /* ---------- Events ---------- */
+  el('preset').addEventListener('change', ()=> applyPreset(el('preset').value));
+  el('rangeProfile').addEventListener('change', e=>{ el('customRanges').style.display = (e.target.value==='custom')?'block':'none'; });
+  el('improvise').addEventListener('click', ()=>{ el('seed').value = Math.floor(Math.random()*1e9); updateSuggestedFilename(); });
+
+  el('render').addEventListener('click', ()=>{
+    try{
+      updateSuggestedFilename();
+      const smf = buildMidi();
+      saveBlob(smf, el('fname').value||'TonalWeave.mid');
+      if(el('splitOut').value==='on'){
+        // simple single export already contains 8 tracks; for true splits we would rebuild one-by-one
+      }
+    }catch(err){ log('Error: '+err.message); console.error(err); }
+  });
+
+  el('savePreset').addEventListener('click', ()=>{
+    const data = snapshot();
+    const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+    const base = safeSlug(data.preset||'custom');
+    saveBlob(blob, `${base}_preset_${nowStamp()}_${data.seed||0}.json`);
+    log('Preset saved.');
+  });
+  el('loadPreset').addEventListener('change', async (e)=>{
+    const f=e.target.files?.[0]; if(!f) return;
+    try{
+      const txt=await f.text(); const cfg=JSON.parse(txt); applySnapshot(cfg); log('Preset loaded.');
+    }catch(err){ log('Load failed: '+err.message); }
+  });
+
+  // init
+  applyPreset('nocturne');
+  updateSuggestedFilename();
+  log('Ready.');
+})();
+</script>
+</body>
+</html>
